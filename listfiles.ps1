@@ -1,13 +1,8 @@
-# Set the starting path
-$rootPath = "C:\"
+$rootPath = "\\ServerName\SharedFolder"  # Change to your network share
 
-# Function to check if a directory is accessible
 function Test-DirectoryAccess {
-    param (
-        [string]$Path
-    )
+    param ([string]$Path)
     try {
-        # Attempt to get child items to test access
         Get-ChildItem -Path $Path -Directory -ErrorAction Stop | Out-Null
         return $true
     } catch {
@@ -15,32 +10,34 @@ function Test-DirectoryAccess {
     }
 }
 
-# Recursively check accessible directories
-function Get-AccessibleDirectories {
-    param (
-        [string]$StartPath
-    )
+function Get-DeepestAccessibleDirectories {
+    param ([string]$StartPath)
 
     $queue = New-Object System.Collections.Generic.Queue[string]
     $queue.Enqueue($StartPath)
 
     while ($queue.Count -gt 0) {
         $current = $queue.Dequeue()
+
         if (Test-DirectoryAccess -Path $current) {
-            Write-Output "Accessible: $current"
+            $accessibleSubDirs = @()
+
             try {
                 $subDirs = Get-ChildItem -Path $current -Directory -ErrorAction Stop
                 foreach ($dir in $subDirs) {
-                    $queue.Enqueue($dir.FullName)
+                    if (Test-DirectoryAccess -Path $dir.FullName) {
+                        $accessibleSubDirs += $dir.FullName
+                        $queue.Enqueue($dir.FullName)
+                    }
                 }
-            } catch {
-                # Just skip if something goes wrong
+            } catch {}
+
+            # If there are no accessible children, this is a "deepest accessible" path
+            if ($accessibleSubDirs.Count -eq 0) {
+                Write-Output $current
             }
-        } else {
-            Write-Output "Inaccessible: $current"
         }
     }
 }
 
-# Start checking from root
-Get-AccessibleDirectories -StartPath $rootPath
+Get-DeepestAccessibleDirectories -StartPath $rootPath
