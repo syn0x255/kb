@@ -1,4 +1,5 @@
-$rootPath = "\\ServerName\SharedFolder"  # Change to your network share
+$rootPath = "\\ServerName\SharedFolder"  # Replace with your root path
+$outputFile = "C:\accessible_paths.txt"  # Output file path
 
 function Test-DirectoryAccess {
     param ([string]$Path)
@@ -10,34 +11,31 @@ function Test-DirectoryAccess {
     }
 }
 
-function Get-DeepestAccessibleDirectories {
+function Get-AllAccessibleDirectories {
     param ([string]$StartPath)
 
     $queue = New-Object System.Collections.Generic.Queue[string]
     $queue.Enqueue($StartPath)
 
+    $results = @()
+
     while ($queue.Count -gt 0) {
         $current = $queue.Dequeue()
 
         if (Test-DirectoryAccess -Path $current) {
-            $accessibleSubDirs = @()
+            $results += $current
 
             try {
                 $subDirs = Get-ChildItem -Path $current -Directory -ErrorAction Stop
                 foreach ($dir in $subDirs) {
-                    if (Test-DirectoryAccess -Path $dir.FullName) {
-                        $accessibleSubDirs += $dir.FullName
-                        $queue.Enqueue($dir.FullName)
-                    }
+                    $queue.Enqueue($dir.FullName)
                 }
             } catch {}
-
-            # If there are no accessible children, this is a "deepest accessible" path
-            if ($accessibleSubDirs.Count -eq 0) {
-                Write-Output $current
-            }
         }
     }
+
+    # Write all accessible directories to file
+    $results | Sort-Object | Set-Content -Path $outputFile -Encoding UTF8
 }
 
-Get-DeepestAccessibleDirectories -StartPath $rootPath
+Get-AllAccessibleDirectories -StartPath $rootPath
